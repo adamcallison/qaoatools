@@ -1,5 +1,6 @@
 import skopt
 import numpy as np
+import scipy.interpolate as spi
 
 import optim_spsa
 import optim_gridsearch
@@ -207,6 +208,82 @@ def spsa_minimize_linear(func, layers, mixer_param_bounds_init, \
     opt_mixer_params = opt_params[1] + (mixer_params_unscaled*mixer_param_diff)
     opt_problem_params = opt_params[2] + \
         (problem_params_unscaled*problem_param_diff)
+    opt_objective = final_state['best_objective_value']
+
+    return opt_mixer_params, opt_problem_params, opt_objective
+
+
+def interp(points):
+    xs, ys = tuple(zip(*tuple(points)))
+    sfunc = spi.PchipInterpolator(xs, ys)
+    return sfunc
+def schedule(points, layers):
+    sfunc = interp(points)
+    params = sfunc(np.arange(1, layers+1)/(layers+1))
+    return params
+def spsa_minimize_interp(func, layers, mixer_param_points_init, \
+    problem_param_points_init, runs):
+
+    n_mixer_points = len(mixer_param_points_init)
+    n_problem_points = len(mixer_param_points_init)
+
+    def cost_function(params):
+        mixer_points = ()
+        for j in range(n_mixer_points):
+            mixer_points += ((params[2*j], params[(2*j)+1]),)
+        problem_points = ()
+        for j in range(n_mixer_points, n_mixer_points+n_problem_points):
+            problem_points += ((params[2*j], params[(2*j)+1]),)
+        mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
+        problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
+
+        mixer_params = schedule(mixer_points, layers)
+        problem_params = schedule(problem_points, layers)
+        return func(mixer_params, problem_params)
+
+    initial_position = []
+    for j in range(n_mixer_points):
+        initial_position += list(mixer_param_points_init[j])
+    for j in range(n_problem_points):
+        initial_position += list(problem_param_points_init[j])
+    initial_position = np.array(initial_position)
+
+    params = initial_position
+    mixer_points = ()
+    for j in range(n_mixer_points):
+        mixer_points += ((params[2*j], params[(2*j)+1]),)
+    problem_points = ()
+    for j in range(n_mixer_points, n_mixer_points+n_problem_points):
+        problem_points += ((params[2*j], params[(2*j)+1]),)
+    mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
+    problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
+    mixer_params = schedule(mixer_points, layers)
+    problem_params = schedule(problem_points, layers)
+    print(mixer_params)
+    print(problem_params)
+
+
+
+    perturb = 0.01
+    lr = 0.01
+
+    final_state = optim_spsa.minimize(cost_function, initial_position, \
+        runs=runs, tolerance=1e-8, max_iterations=2000000, alpha=0.602, \
+        lr=lr, perturb=perturb, gamma=0.101, blocking=False, \
+        allowed_increase=0.5)
+
+    opt_params = np.array(final_state['best_position'])
+    mixer_points = ()
+    for j in range(n_mixer_points):
+        mixer_points += ((opt_params[2*j], opt_params[(2*j)+1]),)
+    problem_points = ()
+    for j in range(n_mixer_points, n_mixer_points+n_problem_points):
+        problem_points += ((opt_params[2*j], opt_params[(2*j)+1]),)
+    mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
+    problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
+    opt_mixer_params = schedule(mixer_points, layers)
+    opt_problem_params = schedule(problem_points, layers)
+
     opt_objective = final_state['best_objective_value']
 
     return opt_mixer_params, opt_problem_params, opt_objective
