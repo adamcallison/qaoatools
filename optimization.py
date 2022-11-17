@@ -259,10 +259,6 @@ def spsa_minimize_interp(func, layers, mixer_param_points_init, \
     problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
     mixer_params = schedule(mixer_points, layers)
     problem_params = schedule(problem_points, layers)
-    print(mixer_params)
-    print(problem_params)
-
-
 
     perturb = 0.01
     lr = 0.01

@@ -1,7 +1,9 @@
 import numpy as np
+import mix_util
+#import numba 
+#numba.set_num_threads(4)
 from numba import njit
 
-import mix_util
 import optimization
 
 
