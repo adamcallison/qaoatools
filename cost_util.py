@@ -52,3 +52,18 @@ def erdosrenyi_maxcut(n_nodes, edge_probability):
                 J[j, k] += 0.5
 
     return A, (J, h, c)
+
+def isingify_m2s(nqubits, prob):
+    J = np.zeros((nqubits, nqubits))
+    h = np.zeros(nqubits)
+    c = 0.0
+
+    for i, clause in enumerate(prob):
+        s0, v0, s1, v1 = tuple([int(x) for x in clause])
+
+        c += 0.25
+        J[v0, v1] += 0.25*s0*s1
+        h[v0] -= 0.25*s0
+        h[v1] -= 0.25*s1
+
+    return J, h, c
