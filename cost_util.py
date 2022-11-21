@@ -13,12 +13,12 @@ def cost_hamiltonian(J, h, ic):
     assert n2 == n3
     n = n1
 
-    Hp = qu.ikron(ic*Identity, dims=(2,)*n, inds=(0,), sparse=True)
+    Hp = qu.ikron(ic*Identity, dims=(2,)*n, inds=(n-1,), sparse=True)
     for i in range(n):
-        Hp += qu.ikron(h[i]*Z, dims=(2,)*n, inds=(i,), sparse=True)
+        Hp += qu.ikron(h[i]*Z, dims=(2,)*n, inds=((n-i)-1,), sparse=True)
         for j in range(n):
             if i==j: continue
-            Hp += qu.ikron([J[i,j]*Z, Z], dims=(2,)*n, inds=(i, j), sparse=True)
+            Hp += qu.ikron([J[i,j]*Z, Z], dims=(2,)*n, inds=((n-i)-1, (n-j)-1), sparse=True)
 
     return Hp
 

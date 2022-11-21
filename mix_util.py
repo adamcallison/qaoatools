@@ -19,7 +19,7 @@ def standard_mixer_eigenvalues(n):
 
 @lru_cache(maxsize=1)
 def standard_mixer_hamiltonian(n):
-    Hw = qu.ikron(n*Identity, dims=(2,)*n, inds=(0,), sparse=True)
+    Hw = qu.ikron(n*Identity, dims=(2,)*n, inds=(n-1,), sparse=True)
     for i in range(n):
-        Hw -= qu.ikron(X, dims=(2,)*n, inds=(i,), sparse=True)
+        Hw -= qu.ikron(X, dims=(2,)*n, inds=((n-i)-1,), sparse=True)
     return Hw
