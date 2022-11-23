@@ -143,7 +143,7 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
     sample_catcher = {}
 
     if optimizer in ('gp', 'gp_lbl', 'spsa', 'spsa_mixer', 'spsa_linear', \
-        'spsa_interp'):
+        'spsa_interp', 'bobyqa_interp', 'bobyqa_interp2'):
         calls = 0
         best_obj = np.inf
         def func(mixer_params, problem_params):
@@ -265,16 +265,31 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
             spsa_minimize_linear(func, layers, mixer_param_bounds_init, \
             problem_param_bounds_init, spsa_runs)
 
-    if optimizer in ('spsa_interp',):
+    if optimizer in ('spsa_interp', 'bobyqa_interp'):
         problem_param_points_init = optimization_options[\
             'problem_param_points_init']
         mixer_param_points_init = optimization_options[\
             'mixer_param_points_init']
         spsa_runs = optimization_options.get('runs', 1)
 
-        opt_mixer_params, opt_problem_params, opt_objective = optimization.\
-            spsa_minimize_interp(func, layers, mixer_param_points_init, \
-            problem_param_points_init, spsa_runs)
+        if optimizer == 'spsa_interp':
+            opt_mixer_params, opt_problem_params, opt_objective = \
+                optimization.spsa_minimize_interp(func, layers, \
+                mixer_param_points_init, problem_param_points_init, spsa_runs)
+        elif optimizer == 'bobyqa_interp':
+            opt_mixer_params, opt_problem_params, opt_objective = \
+                optimization.bobyqa_minimize_interp(func, layers, \
+                mixer_param_points_init, problem_param_points_init)
+
+    if optimizer in ('bobyqa_interp2',):
+        problem_param_vals_init = optimization_options[\
+            'problem_param_vals_init']
+        mixer_param_vals_init = optimization_options[\
+            'mixer_param_vals_init']
+
+        opt_mixer_params, opt_problem_params, opt_objective = \
+            optimization.bobyqa_minimize_interp2(func, layers, \
+            mixer_param_vals_init, problem_param_vals_init)
 
     if extra_shots > 0:
         abstract_qaoa_objective(Hp_cost, Hp_run, opt_mixer_params, \

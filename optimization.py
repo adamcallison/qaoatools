@@ -1,4 +1,5 @@
 import skopt
+import pybobyqa
 import numpy as np
 import scipy.interpolate as spi
 
@@ -283,6 +284,111 @@ def spsa_minimize_interp(func, layers, mixer_param_points_init, \
     opt_objective = final_state['best_objective_value']
 
     return opt_mixer_params, opt_problem_params, opt_objective
+
+def bobyqa_minimize_interp(func, layers, mixer_param_points_init, \
+    problem_param_points_init):
+
+    n_mixer_points = len(mixer_param_points_init)
+    n_problem_points = len(mixer_param_points_init)
+
+    def cost_function(params):
+        mixer_points = ()
+        for j in range(n_mixer_points):
+            mixer_points += ((params[2*j], params[(2*j)+1]),)
+        problem_points = ()
+        for j in range(n_mixer_points, n_mixer_points+n_problem_points):
+            problem_points += ((params[2*j], params[(2*j)+1]),)
+        mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
+        problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
+
+        mixer_params = schedule(mixer_points, layers)
+        problem_params = schedule(problem_points, layers)
+        return func(mixer_params, problem_params)
+
+    initial_position = []
+    for j in range(n_mixer_points):
+        initial_position += list(mixer_param_points_init[j])
+    for j in range(n_problem_points):
+        initial_position += list(problem_param_points_init[j])
+    initial_position = np.array(initial_position)
+
+    params = initial_position
+    mixer_points = ()
+    for j in range(n_mixer_points):
+        mixer_points += ((params[2*j], params[(2*j)+1]),)
+    problem_points = ()
+    for j in range(n_mixer_points, n_mixer_points+n_problem_points):
+        problem_points += ((params[2*j], params[(2*j)+1]),)
+    mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
+    problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
+    mixer_params = schedule(mixer_points, layers)
+    problem_params = schedule(problem_points, layers)
+
+    soln = pybobyqa.solve(cost_function, initial_position)
+
+    opt_params = np.array(soln.x)
+    mixer_points = ()
+    for j in range(n_mixer_points):
+        mixer_points += ((opt_params[2*j], opt_params[(2*j)+1]),)
+    problem_points = ()
+    for j in range(n_mixer_points, n_mixer_points+n_problem_points):
+        problem_points += ((opt_params[2*j], opt_params[(2*j)+1]),)
+    mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
+    problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
+    opt_mixer_params = schedule(mixer_points, layers)
+    opt_problem_params = schedule(problem_points, layers)
+
+    opt_objective = soln.f
+
+    return opt_mixer_params, opt_problem_params, opt_objective
+
+def bobyqa_minimize_interp2(func, layers, mixer_param_vals_init, \
+    problem_param_vals_init):
+
+    n_mixer_vals = len(mixer_param_vals_init)
+    n_problem_vals = len(mixer_param_vals_init)
+
+    def cost_function(params):
+        mixer_points = ()
+        for j in range(n_mixer_vals):
+            mixer_points += ((j/(n_mixer_vals-1), params[j]),)
+        problem_points = ()
+        for j in range(n_mixer_vals, n_mixer_vals+n_problem_vals):
+            problem_points += (((j-n_mixer_vals)/(n_problem_vals-1), params[j]),)
+        mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
+        problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
+
+        mixer_params = schedule(mixer_points, layers)
+        problem_params = schedule(problem_points, layers)
+        return func(mixer_params, problem_params)
+
+    initial_position = []
+    for j in range(n_mixer_vals):
+        initial_position += [mixer_param_vals_init[j]]
+    for j in range(n_problem_vals):
+        initial_position += [problem_param_vals_init[j]]
+    initial_position = np.array(initial_position)
+
+    params = initial_position
+
+    soln = pybobyqa.solve(cost_function, initial_position)
+
+    opt_params = np.array(soln.x)
+    mixer_points = ()
+    for j in range(n_mixer_vals):
+        mixer_points += ((j/(n_mixer_vals-1), opt_params[j]),)
+    problem_points = ()
+    for j in range(n_mixer_vals, n_mixer_vals+n_problem_vals):
+        problem_points += (((j-n_mixer_vals)/(n_mixer_vals-1), opt_params[j]),)
+    mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
+    problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
+    opt_mixer_params = schedule(mixer_points, layers)
+    opt_problem_params = schedule(problem_points, layers)
+
+    opt_objective = soln.f
+
+    return opt_mixer_params, opt_problem_params, opt_objective
+
 
 def gs_minimize_lbl_weighted(func, mixer_param_bounds, problem_param_bounds, \
     nsteps, tol):
