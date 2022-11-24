@@ -114,6 +114,26 @@ def spsa_minimize(func, mixer_param_init, problem_param_init, runs):
 
     return opt_mixer_params, opt_problem_params, opt_objective
 
+def bobyqa_minimize(func, mixer_param_init, problem_param_init):
+    layers = len(mixer_param_init)
+    initial_position = np.array(list(mixer_param_init) + list(problem_param_init))
+
+    def cost_function(params):
+        mixer_params = params[:layers]
+        problem_params = params[layers:]
+        return func(mixer_params, problem_params)
+
+    soln = pybobyqa.solve(cost_function, initial_position)
+
+    opt_params = np.array(soln.x)
+
+    opt_mixer_params = opt_params[:layers]
+    opt_problem_params = opt_params[layers:]
+
+    opt_objective = soln.f
+
+    return opt_mixer_params, opt_problem_params, opt_objective
+
 def spsa_minimize_lbl_weighted(func, mixer_param_init, problem_param_init, \
     runs):
     layers = len(mixer_param_init)

@@ -142,7 +142,7 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
 
     sample_catcher = {}
 
-    if optimizer in ('gp', 'gp_lbl', 'spsa', 'spsa_mixer', 'spsa_linear', \
+    if optimizer in ('gp', 'gp_lbl', 'spsa', 'bobyqa', 'spsa_mixer', 'spsa_linear', \
         'spsa_interp', 'bobyqa_interp', 'bobyqa_interp2'):
         calls = 0
         best_obj = np.inf
@@ -215,6 +215,16 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
                 opt_mixer_params, opt_problem_params, opt_objective = \
                 optimization.spsa_minimize_lbl_weighted(func, \
                 mixer_param_init, problem_param_init, spsa_runs)
+
+    if optimizer in ('bobyqa',):
+        mixer_param_init = optimization_options.get(\
+            'mixer_param_init', [0.1]*layers)
+        problem_param_init = optimization_options.get(\
+            'problem_param_init', [0.1]*layers)
+        opt_mixer_params, opt_problem_params, opt_objective = \
+            optimization.bobyqa_minimize(func, mixer_param_init, \
+            problem_param_init)
+
 
     if optimizer in ('gs_lbl_weighted',):
         mixer_param_bounds = optimization_options.get(\
