@@ -142,6 +142,8 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
 
     sample_catcher = {}
 
+    extra_output = None
+
     if optimizer in ('gp', 'gp_lbl', 'spsa', 'bobyqa', 'spsa_mixer', 'spsa_linear', \
         'spsa_interp', 'bobyqa_interp', 'bobyqa_interp2'):
         calls = 0
@@ -297,7 +299,7 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
         mixer_param_vals_init = optimization_options[\
             'mixer_param_vals_init']
 
-        opt_mixer_params, opt_problem_params, opt_objective = \
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
             optimization.bobyqa_minimize_interp2(func, layers, \
             mixer_param_vals_init, problem_param_vals_init)
 
@@ -308,4 +310,4 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
 
     samples = process_sample_catcher(Hp_cost, sample_catcher)
 
-    return opt_mixer_params, opt_problem_params, opt_objective, samples
+    return opt_mixer_params, opt_problem_params, opt_objective, samples, extra_output

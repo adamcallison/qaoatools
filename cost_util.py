@@ -36,6 +36,16 @@ def cost_eigenvalues(J, h, c):
             costs += ((-1)**(q1bit + q2bit))*J[q1, q2]
     return costs
 
+def adjacency_to_maxcut(A, cutoff=0.0):
+    n = A.shape[0]
+    J, h, c = np.zeros((n, n)), np.zeros(n), 0.0
+    for j in range(n):
+        for k in range(n):
+            if np.abs(A[j, k]) > np.abs(cutoff):
+                c += 0.5*A[j, k]
+                J[j, k] += 0.5*A[j, k]
+    return J, h, c
+
 def erdosrenyi_maxcut(n_nodes, edge_probability):
     n = n_nodes
     p = edge_probability
@@ -43,14 +53,9 @@ def erdosrenyi_maxcut(n_nodes, edge_probability):
     for j in range(n-1):
         for k in range(j+1, n):
             A[j, k] = np.random.default_rng().choice([0.0, 1.0], p=[1-p, p])
-    
-    J, h, c = np.zeros((n, n)), np.zeros(n), 0.0
-    for j in range(n):
-        for k in range(n):
-            if A[j, k] == 1:
-                c += 0.5
-                J[j, k] += 0.5
 
+    J, h, c = adjacency_to_maxcut(A)
+    
     return A, (J, h, c)
 
 def isingify_m2s(nqubits, prob):

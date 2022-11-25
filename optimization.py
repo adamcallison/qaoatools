@@ -406,8 +406,11 @@ def bobyqa_minimize_interp2(func, layers, mixer_param_vals_init, \
     opt_problem_params = schedule(problem_points, layers)
 
     opt_objective = soln.f
+    opt_mixer_vals, opt_problem_vals = opt_params[:n_mixer_vals], opt_params[n_mixer_vals:n_mixer_vals+n_problem_vals]
 
-    return opt_mixer_params, opt_problem_params, opt_objective
+    extra_output = (opt_mixer_vals, opt_problem_vals)
+
+    return opt_mixer_params, opt_problem_params, opt_objective, extra_output
 
 
 def gs_minimize_lbl_weighted(func, mixer_param_bounds, problem_param_bounds, \
