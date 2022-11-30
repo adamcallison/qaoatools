@@ -114,7 +114,7 @@ def spsa_minimize(func, mixer_param_init, problem_param_init, runs):
 
     return opt_mixer_params, opt_problem_params, opt_objective
 
-def bobyqa_minimize(func, mixer_param_init, problem_param_init):
+def bobyqa_minimize(func, mixer_param_init, problem_param_init, noisy, max_for_global=None):
     layers = len(mixer_param_init)
     initial_position = np.array(list(mixer_param_init) + list(problem_param_init))
 
@@ -123,7 +123,16 @@ def bobyqa_minimize(func, mixer_param_init, problem_param_init):
         problem_params = params[layers:]
         return func(mixer_params, problem_params)
 
-    soln = pybobyqa.solve(cost_function, initial_position)
+    if max_for_global is None:
+        seek_global = False
+    else:
+        seek_global = True
+        bounds = ( np.array([0.0]*(2*layers)), np.array([max_for_global]*(2*layers)) )
+
+    if seek_global:
+        soln = pybobyqa.solve(cost_function, initial_position, bounds=bounds, objfun_has_noise=noisy, seek_global_minimum=seek_global)
+    else:
+        soln = pybobyqa.solve(cost_function, initial_position, objfun_has_noise=noisy, seek_global_minimum=seek_global)
 
     opt_params = np.array(soln.x)
 
@@ -306,10 +315,17 @@ def spsa_minimize_interp(func, layers, mixer_param_points_init, \
     return opt_mixer_params, opt_problem_params, opt_objective
 
 def bobyqa_minimize_interp(func, layers, mixer_param_points_init, \
-    problem_param_points_init):
+    problem_param_points_init, noisy, max_for_global=None):
 
     n_mixer_points = len(mixer_param_points_init)
     n_problem_points = len(mixer_param_points_init)
+
+    if max_for_global is None:
+        seek_global = False
+    else:
+        seek_global = True
+        bounds = ( np.array([0.0]*(2*(n_mixer_points+n_problem_points))), np.array([max_for_global]*(2*(n_mixer_points+n_problem_points))) )
+
 
     def cost_function(params):
         mixer_points = ()
@@ -344,7 +360,10 @@ def bobyqa_minimize_interp(func, layers, mixer_param_points_init, \
     mixer_params = schedule(mixer_points, layers)
     problem_params = schedule(problem_points, layers)
 
-    soln = pybobyqa.solve(cost_function, initial_position)
+    if seek_global:
+        soln = pybobyqa.solve(cost_function, initial_position, bounds=bounds, objfun_has_noise=noisy, seek_global_minimum=seek_global)
+    else:
+        soln = pybobyqa.solve(cost_function, initial_position, objfun_has_noise=noisy, seek_global_minimum=seek_global)
 
     opt_params = np.array(soln.x)
     mixer_points = ()
@@ -363,10 +382,16 @@ def bobyqa_minimize_interp(func, layers, mixer_param_points_init, \
     return opt_mixer_params, opt_problem_params, opt_objective
 
 def bobyqa_minimize_interp2(func, layers, mixer_param_vals_init, \
-    problem_param_vals_init):
+    problem_param_vals_init, noisy, max_for_global=None):
 
     n_mixer_vals = len(mixer_param_vals_init)
     n_problem_vals = len(mixer_param_vals_init)
+
+    if max_for_global is None:
+        seek_global = False
+    else:
+        seek_global = True
+        bounds = ( np.array([0.0]*(n_mixer_vals+n_problem_vals)), np.array([max_for_global]*(n_mixer_vals+n_problem_vals)) )
 
     def cost_function(params):
         mixer_points = ()
@@ -391,7 +416,10 @@ def bobyqa_minimize_interp2(func, layers, mixer_param_vals_init, \
 
     params = initial_position
 
-    soln = pybobyqa.solve(cost_function, initial_position)
+    if seek_global:
+        soln = pybobyqa.solve(cost_function, initial_position, bounds=bounds, objfun_has_noise=noisy, seek_global_minimum=seek_global)
+    else:
+        soln = pybobyqa.solve(cost_function, initial_position, objfun_has_noise=noisy, seek_global_minimum=seek_global)
 
     opt_params = np.array(soln.x)
     mixer_points = ()
@@ -411,7 +439,6 @@ def bobyqa_minimize_interp2(func, layers, mixer_param_vals_init, \
     extra_output = (opt_mixer_vals, opt_problem_vals)
 
     return opt_mixer_params, opt_problem_params, opt_objective, extra_output
-
 
 def gs_minimize_lbl_weighted(func, mixer_param_bounds, problem_param_bounds, \
     nsteps, tol):
@@ -471,3 +498,101 @@ def sa_minimize_lbl_weighted(func, mixer_param_bounds, problem_param_bounds, \
     opt_problem_params = np.array(opt_problem_params)
 
     return opt_mixer_params, opt_problem_params, opt_objective
+
+def bobyqa_minimize_fourier(func, layers, mixer_modes_init, problem_modes_init, noisy, max_for_global=None):
+
+    n_mixer_modes = len(mixer_modes_init)
+    n_problem_modes = len(problem_modes_init)
+
+    if max_for_global is None:
+        seek_global = False
+    else:
+        seek_global = True
+        bounds = ( np.array([0.0]*(n_mixer_modes+n_problem_modes)), np.array([max_for_global]*(n_mixer_modes+n_problem_modes)) )
+
+    def cost_function(params):
+        mixer_modes = params[:n_mixer_modes]
+        problem_modes = params[n_mixer_modes:n_mixer_modes+n_problem_modes]
+        mixer_params, problem_params = [], []
+        for j in range(1, layers+1):
+            mixer_param = np.sum([mixer_modes[k-1]*np.cos( (k-0.5)*(j-0.5)*(np.pi/layers) ) for k in range(1, n_mixer_modes+1)])
+            problem_param = np.sum([problem_modes[k-1]*np.sin( (k-0.5)*(j-0.5)*(np.pi/layers) ) for k in range(1, n_problem_modes+1)])
+            mixer_params.append(mixer_param)
+            problem_params.append(problem_param)
+        mixer_params, problem_params = np.array(mixer_params), np.array(problem_params)
+        return func(mixer_params, problem_params)
+
+    initial_position = np.array(list(mixer_modes_init) + list(problem_modes_init))
+
+    maxfun = 100*(n_mixer_modes+n_problem_modes+1)
+
+    if seek_global:
+        soln = pybobyqa.solve(cost_function, initial_position, bounds=bounds, objfun_has_noise=noisy, seek_global_minimum=seek_global, maxfun=maxfun)
+    else:
+        soln = pybobyqa.solve(cost_function, initial_position, objfun_has_noise=noisy, seek_global_minimum=seek_global, maxfun=maxfun)
+
+    opt_params = np.array(soln.x)
+    opt_mixer_modes = opt_params[:n_mixer_modes]
+    opt_problem_modes = opt_params[n_mixer_modes:n_mixer_modes+n_problem_modes]
+    opt_mixer_params, opt_problem_params = [], []
+    for j in range(1, layers+1):
+        mixer_param = np.sum([opt_mixer_modes[k-1]*np.cos( (k-0.5)*(j-0.5)*(np.pi/layers) ) for k in range(1, n_mixer_modes+1)])
+        problem_param = np.sum([opt_problem_modes[k-1]*np.sin( (k-0.5)*(j-0.5)*(np.pi/layers) ) for k in range(1, n_problem_modes+1)])
+        opt_mixer_params.append(mixer_param)
+        opt_problem_params.append(problem_param)
+    opt_mixer_params, opt_problem_params = np.array(opt_mixer_params), np.array(opt_problem_params)
+
+    opt_objective = soln.f
+
+    extra_output = (opt_mixer_modes, opt_problem_modes)
+
+    return opt_mixer_params, opt_problem_params, opt_objective, extra_output
+
+def spsa_minimize_fourier(func, layers, mixer_modes_init, problem_modes_init, runs):
+
+    n_mixer_modes = len(mixer_modes_init)
+    n_problem_modes = len(problem_modes_init)
+
+    def cost_function(params):
+        mixer_modes = params[:n_mixer_modes]
+        problem_modes = params[n_mixer_modes:n_mixer_modes+n_problem_modes]
+        mixer_params, problem_params = [], []
+        for j in range(1, layers+1):
+            mixer_param = np.sum([mixer_modes[k-1]*np.cos( (k-0.5)*(j-0.5)*(np.pi/layers) ) for k in range(1, n_mixer_modes+1)])
+            problem_param = np.sum([problem_modes[k-1]*np.sin( (k-0.5)*(j-0.5)*(np.pi/layers) ) for k in range(1, n_problem_modes+1)])
+            mixer_params.append(mixer_param)
+            problem_params.append(problem_param)
+        mixer_params, problem_params = np.array(mixer_params), np.array(problem_params)
+        return func(mixer_params, problem_params)
+
+    initial_position = np.array(list(mixer_modes_init) + list(problem_modes_init))
+
+    perturb = 0.1
+    lr = 0.1
+
+    final_state = optim_spsa.minimize(cost_function, initial_position, \
+        runs=runs, tolerance=1e-8, max_iterations=2000000, alpha=0.602, \
+        lr=lr, perturb=perturb, gamma=0.101, blocking=False, \
+        allowed_increase=0.5)
+
+    opt_params = np.array(final_state['best_position'])
+
+    opt_mixer_modes = opt_params[:n_mixer_modes]
+    opt_problem_modes = opt_params[n_mixer_modes:n_mixer_modes+n_problem_modes]
+    opt_mixer_params, opt_problem_params = [], []
+    for j in range(1, layers+1):
+        mixer_param = np.sum([opt_mixer_modes[k-1]*np.cos( (k-0.5)*(j-0.5)*(np.pi/layers) ) for k in range(1, n_mixer_modes+1)])
+        problem_param = np.sum([opt_problem_modes[k-1]*np.sin( (k-0.5)*(j-0.5)*(np.pi/layers) ) for k in range(1, n_problem_modes+1)])
+        opt_mixer_params.append(mixer_param)
+        opt_problem_params.append(problem_param)
+    opt_mixer_params, opt_problem_params = np.array(opt_mixer_params), np.array(opt_problem_params)
+
+    opt_objective = final_state['best_objective_value']
+
+    extra_output = (opt_mixer_modes, opt_problem_modes)
+
+    return opt_mixer_params, opt_problem_params, opt_objective, extra_output
+
+
+
+    

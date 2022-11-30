@@ -144,9 +144,9 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
 
     extra_output = None
 
+    calls = 0
     if optimizer in ('gp', 'gp_lbl', 'spsa', 'bobyqa', 'spsa_mixer', 'spsa_linear', \
-        'spsa_interp', 'bobyqa_interp', 'bobyqa_interp2'):
-        calls = 0
+        'spsa_interp', 'bobyqa_interp', 'bobyqa_interp2', 'bobyqa_fourier', 'spsa_fourier'):
         best_obj = np.inf
         def func(mixer_params, problem_params):
             nonlocal calls
@@ -165,7 +165,6 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
             return obj
     if optimizer in ('gp_lbl_weighted', 'spsa_lbl_weighted', \
         'gs_lbl_weighted', 'sa_lbl_weighted'):
-        calls = 0
         def func(mixer_params, problem_params, xweight):
             nonlocal calls
             obj = abstract_qaoa_objective(Hp_cost, Hp_run, mixer_params, \
@@ -223,10 +222,12 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
             'mixer_param_init', [0.1]*layers)
         problem_param_init = optimization_options.get(\
             'problem_param_init', [0.1]*layers)
+        noisy = optimization_options.get('noisy', True)
+        max_for_global = optimization_options.get('max_for_global', 1.0)
+
         opt_mixer_params, opt_problem_params, opt_objective = \
             optimization.bobyqa_minimize(func, mixer_param_init, \
-            problem_param_init)
-
+            problem_param_init, noisy, max_for_global)
 
     if optimizer in ('gs_lbl_weighted',):
         mixer_param_bounds = optimization_options.get(\
@@ -282,26 +283,46 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
             'problem_param_points_init']
         mixer_param_points_init = optimization_options[\
             'mixer_param_points_init']
-        spsa_runs = optimization_options.get('runs', 1)
 
         if optimizer == 'spsa_interp':
+            spsa_runs = optimization_options.get('runs', 1)
             opt_mixer_params, opt_problem_params, opt_objective = \
                 optimization.spsa_minimize_interp(func, layers, \
                 mixer_param_points_init, problem_param_points_init, spsa_runs)
         elif optimizer == 'bobyqa_interp':
+            noisy = optimization_options.get('noisy', True)
+            max_for_global = optimization_options.get('max_for_global', 1.0)
+
             opt_mixer_params, opt_problem_params, opt_objective = \
                 optimization.bobyqa_minimize_interp(func, layers, \
-                mixer_param_points_init, problem_param_points_init)
+                mixer_param_points_init, problem_param_points_init, noisy, max_for_global)
 
     if optimizer in ('bobyqa_interp2',):
         problem_param_vals_init = optimization_options[\
             'problem_param_vals_init']
         mixer_param_vals_init = optimization_options[\
             'mixer_param_vals_init']
-
+        noisy = optimization_options.get('noisy', True)
+        max_for_global = optimization_options.get('max_for_global', 1.0)
+    
         opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
             optimization.bobyqa_minimize_interp2(func, layers, \
-            mixer_param_vals_init, problem_param_vals_init)
+            mixer_param_vals_init, problem_param_vals_init, noisy, max_for_global=max_for_global)
+
+    if optimizer in ('bobyqa_fourier', 'spsa_fourier'):
+        problem_modes_init = optimization_options['problem_modes_init']
+        mixer_modes_init = optimization_options['mixer_modes_init']
+        if optimizer == 'bobyqa_fourier':
+            noisy = optimization_options.get('noisy', True)
+            max_for_global = optimization_options.get('max_for_global', 1.0)
+            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
+                optimization.bobyqa_minimize_fourier(func, layers, \
+                mixer_modes_init, problem_modes_init, noisy, max_for_global=max_for_global)
+        if optimizer == 'spsa_fourier':
+            spsa_runs = optimization_options.get('runs', 1)
+            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
+                optimization.spsa_minimize_fourier(func, layers, \
+                mixer_modes_init, problem_modes_init, spsa_runs)
 
     if extra_shots > 0:
         abstract_qaoa_objective(Hp_cost, Hp_run, opt_mixer_params, \
@@ -309,5 +330,9 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
             sample_catcher=sample_catcher)
 
     samples = process_sample_catcher(Hp_cost, sample_catcher)
+
+    if extra_output is None:
+        extra_output = ()
+    extra_output = tuple(extra_output) + (calls,)
 
     return opt_mixer_params, opt_problem_params, opt_objective, samples, extra_output
