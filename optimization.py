@@ -99,8 +99,8 @@ def spsa_minimize(func, mixer_param_init, problem_param_init, runs):
         problem_params = params[layers:]
         return func(mixer_params, problem_params)
 
-    perturb = 0.1
-    lr = 0.1
+    perturb = 0.01
+    lr = 0.01
 
     final_state = optim_spsa.minimize(cost_function, initial_position, \
         runs=runs, tolerance=1e-8, max_iterations=2000000, alpha=0.602, \
@@ -251,6 +251,12 @@ def schedule(points, layers):
     sfunc = interp(points)
     params = sfunc(np.arange(1, layers+1)/(layers+1))
     return params
+
+def move_points(old_points, new_xs):
+    old_sfunc = interp(old_points)
+    new_points = [(new_x, old_sfunc(new_x)) for new_x in new_xs]
+    return new_points
+
 def spsa_minimize_interp(func, layers, mixer_param_points_init, \
     problem_param_points_init, runs):
 
