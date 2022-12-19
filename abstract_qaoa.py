@@ -205,7 +205,6 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
         mixer_param_vals_init = optimization_options[\
             'mixer_param_vals_init']
         if optimizer == 'spsa_interp2':
-            print('here')
             spsa_runs = optimization_options.get('runs', 1)
 
             opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
