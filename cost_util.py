@@ -1,5 +1,9 @@
 import numpy as np
 import quimb as qu
+
+import random
+from functools import lru_cache
+
 Z = qu.pauli('z',2,sparse=True, dtype=np.float64)
 X = qu.pauli('x',2,sparse=True, dtype=np.float64)
 Identity = qu.pauli('i', 2, sparse=True, dtype=np.float64)
@@ -72,3 +76,22 @@ def isingify_m2s(nqubits, prob):
         h[v1] -= 0.25*s1
 
     return J, h, c
+
+@lru_cache(maxsize=1)
+def max2sat_all_clauses(nqubits):
+    all_clauses = []
+    for s1 in (-1, 1):
+        for q1 in range(nqubits):
+            for s2 in (-1, 1):
+                for q2 in range(nqubits):
+                    if q1 == q2:
+                        continue
+                    all_clauses.append((s1, q1, s2, q2))
+    all_clauses = sorted(all_clauses, key=lambda x:(x[1]*nqubits)+x[3])
+    return all_clauses
+
+def max2sat_prob(nqubits=None, nclauses=None):
+    ac = max2sat_all_clauses(nqubits)
+    cs = random.sample(ac, nclauses)
+    cs = sorted(cs, key=lambda x:(x[1]*nqubits)+x[3])
+    return np.array(cs)

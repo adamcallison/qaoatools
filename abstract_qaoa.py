@@ -135,7 +135,7 @@ def process_sample_catcher(Hp, sample_catcher):
     return (samples, counts, nrgs)
 
 def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
-    optimizer='gp', optimization_options=None, verbose=False):
+    optimizer='bobyqa', optimization_options=None, verbose=False):
     optimizer = optimizer.lower()
     if optimization_options is None:
         optimization_options = {}
@@ -145,93 +145,101 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
     extra_output = None
 
     calls = 0
-    if optimizer in ('spsa', 'bobyqa', 'spsa_interp', 'spsa_interp2', 'bobyqa_interp', 'bobyqa_interp2', 'bobyqa_fourier', 'spsa_fourier'):
-        best_obj = np.inf
-        def func(mixer_params, problem_params):
-            nonlocal calls
-            nonlocal best_obj
-            obj = abstract_qaoa_objective(Hp_cost, Hp_run, mixer_params, \
-                problem_params, shots=shots, sample_catcher=sample_catcher)
-            calls += 1
-            if obj < best_obj:
-                best_obj = obj
-            if verbose:
-                print(f"{calls} completed. "+\
-                    f"Current best objective: {best_obj}      ", end="\r")
-            return obj
+    best_obj = np.inf
+    def func(mixer_params, problem_params):
+        nonlocal calls
+        nonlocal best_obj
+        obj = abstract_qaoa_objective(Hp_cost, Hp_run, mixer_params, \
+            problem_params, shots=shots, sample_catcher=sample_catcher)
+        calls += 1
+        if obj < best_obj:
+            best_obj = obj
+        if verbose:
+            print(f"{calls} completed. "+\
+                f"Current best objective: {best_obj}      ", end="\r")
+        return obj
 
-    if optimizer in ('spsa', 'bobyqa'):
-        mixer_param_init = optimization_options.get(\
-            'mixer_param_init', [0.1]*layers)
-        problem_param_init = optimization_options.get(\
-            'problem_param_init', [0.1]*layers)
-        if optimizer in ('spsa',):
-            spsa_runs = optimization_options.get('runs', 1)
-            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
-                optimization.spsa_minimize(func, layers, mixer_param_init, \
-                problem_param_init, spsa_runs)
-        elif optimizer in ('bobyqa',):
-            noisy = optimization_options.get('noisy', True)
-            max_for_global = optimization_options.get('max_for_global', 1.0)
-            maxfun = optimization_options.get('maxfun', None)
-
-            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
-                optimization.bobyqa_minimize(func, layers, mixer_param_init, \
-                problem_param_init, noisy, maxfun=maxfun, max_for_global=max_for_global)
-
-    if optimizer in ('spsa_interp', 'bobyqa_interp'):
-        problem_param_points_init = optimization_options[\
-            'problem_param_points_init']
-        mixer_param_points_init = optimization_options[\
-            'mixer_param_points_init']
-
-        if optimizer == 'spsa_interp':
-            spsa_runs = optimization_options.get('runs', 1)
-            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
-                optimization.spsa_minimize_interp(func, layers, \
-                mixer_param_points_init, problem_param_points_init, spsa_runs)
-        elif optimizer == 'bobyqa_interp':
-            noisy = optimization_options.get('noisy', True)
-            max_for_global = optimization_options.get('max_for_global', 1.0)
-            maxfun = optimization_options.get('maxfun', None)
-
-            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
-                optimization.bobyqa_minimize_interp(func, layers, \
-                mixer_param_points_init, problem_param_points_init, noisy, maxfun=maxfun, max_for_global=max_for_global)
-
-    if optimizer in ('spsa_interp2', 'bobyqa_interp2'):
-        problem_param_vals_init = optimization_options[\
-            'problem_param_vals_init']
-        mixer_param_vals_init = optimization_options[\
-            'mixer_param_vals_init']
-        if optimizer == 'spsa_interp2':
-            spsa_runs = optimization_options.get('runs', 1)
-
-            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
-                optimization.spsa_minimize_interp2(func, layers, mixer_param_vals_init, problem_param_vals_init, spsa_runs)
-
-        elif optimizer == 'bobyqa_interp2':
-            noisy = optimization_options.get('noisy', True)
-            max_for_global = optimization_options.get('max_for_global', 1.0)
-            maxfun = optimization_options.get('maxfun', None)
-
-            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
-            optimization.bobyqa_minimize_interp2(func, layers, mixer_param_vals_init, problem_param_vals_init, noisy, maxfun=maxfun, max_for_global=max_for_global)
-
-    if optimizer in ('bobyqa_fourier', 'spsa_fourier'):
-        problem_modes_init = optimization_options['problem_modes_init']
+    if optimizer in ('spsa', 'spsa_interp', 'spsa_interp2', 'spsa_fourier'):
+        opt_alg = 'spsa'
+    if optimizer in ('bobyqa', 'bobyqa_interp', 'bobyqa_interp2', 'bobyqa_fourier'):
+        opt_alg = 'bobyqa'
+    if optimizer in ('sa', 'sa_interp', 'sa_interp2', 'sa_fourier'):
+        opt_alg = 'sa'
+    
+    if optimizer in ('spsa', 'bobyqa', 'sa'):
+        param_type = 'standard'
+    if optimizer in ('spsa_interp', 'bobyqa_interp', 'sa_interp'):
+        param_type = 'interp'
+    if optimizer in ('spsa_interp2', 'bobyqa_interp2', 'sa_interp2'):
+        param_type = 'interp2'
+    if optimizer in ('spsa_fourier', 'bobyqa_fourier', 'sa_fourier'):
+        param_type = 'interp2'
+    
+    if param_type == 'standard':
+        mixer_param_init = optimization_options['mixer_param_init']
+        problem_param_init = optimization_options['problem_param_init']
+    if param_type == 'interp':
+        mixer_param_points_init = optimization_options['mixer_param_points_init']
+        problem_param_points_init = optimization_options['problem_param_points_init']
+    if param_type == 'interp2':
+        mixer_param_vals_init = optimization_options['mixer_param_vals_init']
+        problem_param_vals_init = optimization_options['problem_param_vals_init']
+    if param_type == 'fourier':
         mixer_modes_init = optimization_options['mixer_modes_init']
-        if optimizer == 'bobyqa_fourier':
-            noisy = optimization_options.get('noisy', True)
-            max_for_global = optimization_options.get('max_for_global', 1.0)
-            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
-                optimization.bobyqa_minimize_fourier(func, layers, \
-                mixer_modes_init, problem_modes_init, noisy, max_for_global=max_for_global)
-        elif optimizer == 'spsa_fourier':
-            spsa_runs = optimization_options.get('runs', 1)
-            opt_mixer_params, opt_problem_params, opt_objective, extra_output = \
-                optimization.spsa_minimize_fourier(func, layers, \
-                mixer_modes_init, problem_modes_init, spsa_runs)
+        problem_modes_init = optimization_options['problem_modes_init']
+
+    if opt_alg == 'spsa':
+        spsa_runs = optimization_options.get('runs', 1)
+    if opt_alg == 'bobyqa':
+        noisy = optimization_options.get('noisy', True)
+        max_for_global = optimization_options.get('max_for_global', 1.0)
+        maxfun = optimization_options.get('maxfun', None)
+        restart = optimization_options.get('restart', False)
+    if opt_alg == 'sa':
+        param_max = optimization_options.get('param_max', np.pi)
+        stepsize = optimization_options.get('stepsize', 0.05)
+        iterations = optimization_options.get('iterations', 1000)
+        runs = optimization_options.get('runs', 1)
+        max_temperature = optimization_options.get('max_temperature', 10)
+
+    if optimizer == 'spsa':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.spsa_minimize(\
+            func, layers, mixer_param_init, problem_param_init, spsa_runs)
+    if optimizer == 'spsa_interp':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.spsa_minimize_interp(\
+            func, layers, mixer_param_points_init, problem_param_points_init, spsa_runs)
+    if optimizer == 'spsa_interp2':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.spsa_minimize_interp2(\
+            func, layers, mixer_param_vals_init, problem_param_vals_init, spsa_runs)
+    if optimizer == 'spsa_fourier':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.spsa_minimize_fourier(\
+            func, layers, mixer_modes_init, problem_modes_init, spsa_runs)
+
+    if optimizer == 'bobyqa':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.bobyqa_minimize(\
+            func, layers, mixer_param_init, problem_param_init, noisy, maxfun=maxfun, max_for_global=max_for_global, restart=restart)
+    if optimizer == 'bobyqa_interp':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.bobyqa_minimize_interp(\
+            func, layers, mixer_param_points_init, problem_param_points_init, noisy, maxfun=maxfun, max_for_global=max_for_global, restart=restart)
+    if optimizer == 'bobyqa_interp2':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.bobyqa_minimize_interp2(\
+            func, layers, mixer_param_vals_init, problem_param_vals_init, noisy, maxfun=maxfun, max_for_global=max_for_global, restart=restart)
+    if optimizer == 'bobyqa_fourier':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.bobyqa_minimize_fourier(\
+            func, layers, mixer_modes_init, problem_modes_init, noisy, maxfun=maxfun, max_for_global=max_for_global, restart=restart)
+
+    if optimizer == 'sa':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.sa_minimize(\
+            func, layers, mixer_param_init, problem_param_init, param_max, stepsize, iterations, runs, max_temperature)
+    if optimizer == 'sa_interp':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.sa_minimize_interp(\
+            func, layers, mixer_param_points_init, problem_param_points_init, param_max, stepsize, iterations, runs, max_temperature)
+    if optimizer == 'sa_interp2':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.sa_minimize_interp2(\
+            func, layers, mixer_param_vals_init, problem_param_vals_init, param_max, stepsize, iterations, runs, max_temperature)
+    if optimizer == 'sa_fourier':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.sa_minimize_fourier(\
+            func, layers, mixer_modes_init, problem_modes_init, param_max, stepsize, iterations, runs, max_temperature)
 
     if extra_shots > 0:
         abstract_qaoa_objective(Hp_cost, Hp_run, opt_mixer_params, \
