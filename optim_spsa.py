@@ -63,11 +63,6 @@ def _minimize(expectation_value_function, initial_position, tolerance=1e-5, \
         minimizer_state['num_objective_evaluations'] += 2
         
         current_obj = expectation_value_function(minimizer_state['position'] - update)
-        if minimizer_state['objective_value_previous_iteration'] + \
-            minimizer_state['allowed_increase'] >= current_obj or not minimizer_state['blocking']:
-            minimizer_state['position'] = minimizer_state['position'] - update
-            minimizer_state['objective_value_previous_iteration'] = minimizer_state['objective_value']
-            minimizer_state['objective_value'] = current_obj
 
         best_call_this_time = np.argmin((v_m, v_p, current_obj))
         if (v_m, v_p, current_obj)[best_call_this_time] < minimizer_state['best_objective_value']:
@@ -80,6 +75,12 @@ def _minimize(expectation_value_function, initial_position, tolerance=1e-5, \
             else:
                 minimizer_state['best_objective_value'] = current_obj
                 minimizer_state['best_position'] = minimizer_state['position'] - update
+
+        if minimizer_state['objective_value_previous_iteration'] + \
+            minimizer_state['allowed_increase'] >= current_obj or not minimizer_state['blocking']:
+            minimizer_state['position'] = minimizer_state['position'] - update
+            minimizer_state['objective_value_previous_iteration'] = minimizer_state['objective_value']
+            minimizer_state['objective_value'] = current_obj
 
         return minimizer_state
     

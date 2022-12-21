@@ -259,8 +259,10 @@ def optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, prob
         perturb = 0.01
         lr = 0.01
 
+        max_iterations = 2000000
+        
         final_state = optim_spsa.minimize(cost_function, initial_position, \
-            runs=runs, tolerance=1e-8, max_iterations=2000000, alpha=0.602, \
+            runs=runs, tolerance=1e-8, max_iterations=max_iterations, alpha=0.602, \
             lr=lr, perturb=perturb, gamma=0.101, blocking=False, \
             allowed_increase=0.5)
 
