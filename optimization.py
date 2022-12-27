@@ -271,7 +271,7 @@ def optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, prob
 
     if optimizer == 'sa':
         param_max = optimizer_params.get('param_max', np.pi)
-        bounds = [(0, param_max) for j in range(2*layers)]
+        bounds = [(0, param_max) for j in range(len(initial_position))]
         stepsize = optimizer_params.get('stepsize', 0.05)
         iterations = optimizer_params.get('iterations', 1000)
         runs = optimizer_params.get('runs', 1)
