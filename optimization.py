@@ -275,7 +275,7 @@ def optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, prob
         stepsize = optimizer_params.get('stepsize', 0.05)
         iterations = optimizer_params.get('iterations', 1000)
         runs = optimizer_params.get('runs', 1)
-        max_temperature = optimizer_params.get('runs', 10)
+        max_temperature = optimizer_params.get('max_temperature', 10)
 
         opt_objective, opt_params = optim_sa.run(cost_function, initial_position, bounds, stepsize, iterations, runs, max_temperature)
 
