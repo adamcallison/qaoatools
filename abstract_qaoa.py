@@ -173,7 +173,7 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
     if optimizer in ('spsa_interp2', 'bobyqa_interp2', 'sa_interp2'):
         param_type = 'interp2'
     if optimizer in ('spsa_fourier', 'bobyqa_fourier', 'sa_fourier'):
-        param_type = 'interp2'
+        param_type = 'fourier'
     
     if param_type == 'standard':
         mixer_param_init = optimization_options['mixer_param_init']

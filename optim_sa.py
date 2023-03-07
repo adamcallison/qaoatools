@@ -30,7 +30,7 @@ def _run(cost_function, initial_params, param_bounds, stepsize, iterations, max_
             else:
                 candidate[j] += step[j]
         candidate_cost = cost_function(candidate)
-        if candidate_cost < cost:
+        if candidate_cost < best_cost: # was a bug here!!!
             best_cost, best_params = candidate_cost, np.array(candidate)
 
         if candidate_cost <= cost:
