@@ -232,7 +232,8 @@ def optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, prob
             seek_global = False
         else:
             seek_global = True
-            bounds = ( np.array([0.0]*len(initial_position)), np.array([max_for_global]*len(initial_position)) )
+            min_for_global = -max_for_global if param_type == 'fourier' else 0.0
+            bounds = ( np.array([min_for_global]*len(initial_position)), np.array([max_for_global]*len(initial_position)) )
 
         best_opt_objective, curr_nf = np.inf, 0
         while True:
@@ -271,7 +272,8 @@ def optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, prob
 
     if optimizer == 'sa':
         param_max = optimizer_params.get('param_max', np.pi)
-        bounds = [(0, param_max) for j in range(len(initial_position))]
+        param_min = -param_max if param_type == 'fourier' else 0.0
+        bounds = [(param_min, param_max) for j in range(len(initial_position))]
         stepsize = optimizer_params.get('stepsize', 0.05)
         iterations = optimizer_params.get('iterations', 1000)
         runs = optimizer_params.get('runs', 1)
