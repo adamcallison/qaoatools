@@ -156,7 +156,7 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
             best_obj = obj
         if verbose:
             print(f"{calls} completed. "+\
-                f"Current best objective: {best_obj}      ", end="\r")
+                f"Current best objective: {best_obj}. Current objective {obj}.     ", end="\r")
         return obj
 
     if optimizer in ('spsa', 'spsa_interp', 'spsa_interp2', 'spsa_fourier'):

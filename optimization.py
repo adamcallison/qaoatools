@@ -215,7 +215,11 @@ def optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, prob
                 mixer_params.append(mixer_param)
                 problem_params.append(problem_param)
             mixer_params, problem_params = np.array(mixer_params), np.array(problem_params)
-            return func(mixer_params, problem_params)
+            #print(list(mixer_params))
+            #print(list(problem_params))
+            tmp = func(mixer_params, problem_params)
+            #print(tmp)
+            return tmp
 
         initial_position = np.array(list(mixer_modes_init) + list(problem_modes_init))
 
