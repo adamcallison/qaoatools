@@ -165,14 +165,16 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
         opt_alg = 'bobyqa'
     if optimizer in ('sa', 'sa_interp', 'sa_interp2', 'sa_fourier'):
         opt_alg = 'sa'
+    if optimizer in ('bfgs', 'bfgs_interp', 'bfgs_interp2', 'bfgs_fourier'):
+        opt_alg = 'bfgs'
     
-    if optimizer in ('spsa', 'bobyqa', 'sa'):
+    if optimizer in ('spsa', 'bobyqa', 'sa', 'bfgs'):
         param_type = 'standard'
-    if optimizer in ('spsa_interp', 'bobyqa_interp', 'sa_interp'):
+    if optimizer in ('spsa_interp', 'bobyqa_interp', 'sa_interp', 'bfgs_interp'):
         param_type = 'interp'
-    if optimizer in ('spsa_interp2', 'bobyqa_interp2', 'sa_interp2'):
+    if optimizer in ('spsa_interp2', 'bobyqa_interp2', 'sa_interp2', 'bfgs_interp2'):
         param_type = 'interp2'
-    if optimizer in ('spsa_fourier', 'bobyqa_fourier', 'sa_fourier'):
+    if optimizer in ('spsa_fourier', 'bobyqa_fourier', 'sa_fourier', 'bfgs_fourier'):
         param_type = 'fourier'
     
     if param_type == 'standard':
@@ -201,6 +203,8 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
         iterations = optimization_options.get('iterations', 1000)
         runs = optimization_options.get('runs', 1)
         max_temperature = optimization_options.get('max_temperature', 10)
+    if opt_alg == 'bfgs':
+        pass
 
     if optimizer == 'spsa':
         opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.spsa_minimize(\
@@ -240,6 +244,19 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
     if optimizer == 'sa_fourier':
         opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.sa_minimize_fourier(\
             func, layers, mixer_modes_init, problem_modes_init, param_max, stepsize, iterations, runs, max_temperature)
+
+    if optimizer == 'bfgs':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.bfgs_minimize(\
+            func, layers, mixer_param_init, problem_param_init)
+    if optimizer == 'bfgs_interp':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.bfgs_minimize_interp(\
+            func, layers, mixer_param_points_init, problem_param_points_init)
+    if optimizer == 'bfgs_interp2':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.bfgs_minimize_interp2(\
+            func, layers, mixer_param_vals_init, problem_param_vals_init)
+    if optimizer == 'bfgs_fourier':
+        opt_mixer_params, opt_problem_params, opt_objective, extra_output = optimization.bfgs_minimize_fourier(\
+            func, layers, mixer_modes_init, problem_modes_init)
 
     if extra_shots > 0:
         abstract_qaoa_objective(Hp_cost, Hp_run, opt_mixer_params, \

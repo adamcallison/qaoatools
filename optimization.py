@@ -1,62 +1,10 @@
 import pybobyqa
 import numpy as np
 import scipy.interpolate as spi
+import scipy.optimize as spo
 
 import optim_spsa
 import optim_sa
-
-def spsa_minimize_old(func, mixer_param_init, problem_param_init, runs):
-    layers = len(mixer_param_init)
-    initial_position = np.array(list(mixer_param_init) + list(problem_param_init))
-
-    def cost_function(params):
-        mixer_params = params[:layers]
-        problem_params = params[layers:]
-        return func(mixer_params, problem_params)
-
-    perturb = 0.01
-    lr = 0.01
-
-    final_state = optim_spsa.minimize(cost_function, initial_position, \
-        runs=runs, tolerance=1e-8, max_iterations=2000000, alpha=0.602, \
-        lr=lr, perturb=perturb, gamma=0.101, blocking=False, \
-        allowed_increase=0.5)
-
-    opt_mixer_params = final_state['best_position'][:layers]
-    opt_problem_params = final_state['best_position'][layers:]
-
-    opt_objective = final_state['best_objective_value']
-
-    return opt_mixer_params, opt_problem_params, opt_objective
-
-def bobyqa_minimize_old(func, mixer_param_init, problem_param_init, noisy, maxfun=None, max_for_global=None):
-    layers = len(mixer_param_init)
-    initial_position = np.array(list(mixer_param_init) + list(problem_param_init))
-
-    def cost_function(params):
-        mixer_params = params[:layers]
-        problem_params = params[layers:]
-        return func(mixer_params, problem_params)
-
-    if max_for_global is None:
-        seek_global = False
-    else:
-        seek_global = True
-        bounds = ( np.array([0.0]*(2*layers)), np.array([max_for_global]*(2*layers)) )
-
-    if seek_global:
-        soln = pybobyqa.solve(cost_function, initial_position, bounds=bounds, objfun_has_noise=noisy, seek_global_minimum=seek_global, maxfun=maxfun)
-    else:
-        soln = pybobyqa.solve(cost_function, initial_position, objfun_has_noise=noisy, seek_global_minimum=seek_global, maxfun=maxfun)
-
-    opt_params = np.array(soln.x)
-
-    opt_mixer_params = opt_params[:layers]
-    opt_problem_params = opt_params[layers:]
-
-    opt_objective = soln.f
-
-    return opt_mixer_params, opt_problem_params, opt_objective
 
 def interp(points):
     xs, ys = tuple(zip(*tuple(points)))
@@ -72,68 +20,9 @@ def move_points(old_points, new_xs):
     new_points = [(new_x, old_sfunc(new_x)) for new_x in new_xs]
     return new_points
 
-def bobyqa_minimize_interp2_old(func, layers, mixer_param_vals_init, \
-    problem_param_vals_init, noisy, maxfun=None, max_for_global=None):
-
-    n_mixer_vals = len(mixer_param_vals_init)
-    n_problem_vals = len(mixer_param_vals_init)
-
-    if max_for_global is None:
-        seek_global = False
-    else:
-        seek_global = True
-        bounds = ( np.array([0.0]*(n_mixer_vals+n_problem_vals)), np.array([max_for_global]*(n_mixer_vals+n_problem_vals)) )
-
-    def cost_function(params):
-        mixer_points = ()
-        for j in range(n_mixer_vals):
-            mixer_points += ((j/(n_mixer_vals-1), params[j]),)
-        problem_points = ()
-        for j in range(n_mixer_vals, n_mixer_vals+n_problem_vals):
-            problem_points += (((j-n_mixer_vals)/(n_problem_vals-1), params[j]),)
-        mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
-        problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
-
-        mixer_params = schedule(mixer_points, layers)
-        problem_params = schedule(problem_points, layers)
-        return func(mixer_params, problem_params)
-
-    initial_position = []
-    for j in range(n_mixer_vals):
-        initial_position += [mixer_param_vals_init[j]]
-    for j in range(n_problem_vals):
-        initial_position += [problem_param_vals_init[j]]
-    initial_position = np.array(initial_position)
-
-    params = initial_position
-
-    if seek_global:
-        soln = pybobyqa.solve(cost_function, initial_position, bounds=bounds, objfun_has_noise=noisy, seek_global_minimum=seek_global, maxfun=maxfun)
-    else:
-        soln = pybobyqa.solve(cost_function, initial_position, objfun_has_noise=noisy, seek_global_minimum=seek_global, maxfun=maxfun)
-
-    opt_params = np.array(soln.x)
-    mixer_points = ()
-    for j in range(n_mixer_vals):
-        mixer_points += ((j/(n_mixer_vals-1), opt_params[j]),)
-    problem_points = ()
-    for j in range(n_mixer_vals, n_mixer_vals+n_problem_vals):
-        problem_points += (((j-n_mixer_vals)/(n_mixer_vals-1), opt_params[j]),)
-    mixer_points = tuple(sorted(mixer_points, key=lambda x: x[0]))
-    problem_points = tuple(sorted(problem_points, key=lambda x: x[0]))
-    opt_mixer_params = schedule(mixer_points, layers)
-    opt_problem_params = schedule(problem_points, layers)
-
-    opt_objective = soln.f
-    opt_mixer_vals, opt_problem_vals = opt_params[:n_mixer_vals], opt_params[n_mixer_vals:n_mixer_vals+n_problem_vals]
-
-    extra_output = (opt_mixer_vals, opt_problem_vals)
-
-    return opt_mixer_params, opt_problem_params, opt_objective, extra_output
-
 def optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, problem_init, optimizer_params):
     assert param_type in ('standard', 'interp', 'interp2', 'fourier')
-    assert optimizer in ('spsa', 'bobyqa', 'sa')
+    assert optimizer in ('spsa', 'bobyqa', 'sa', 'bfgs')
 
     if param_type == 'standard':
         mixer_param_init, problem_param_init = mixer_init, problem_init
@@ -285,6 +174,10 @@ def optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, prob
 
         opt_objective, opt_params = optim_sa.run(cost_function, initial_position, bounds, stepsize, iterations, runs, max_temperature)
 
+    if optimizer == 'bfgs':
+        res = spo.minimize(cost_function, initial_position, method='BFGS')
+        opt_objective, opt_params = res.fun, res.x
+
     if param_type == 'standard':
         opt_mixer_params = opt_params[:layers]
         opt_problem_params = opt_params[layers:]
@@ -352,6 +245,11 @@ def sa_minimize_all(param_type, func, layers, mixer_init, problem_init, param_ma
     optimizer_params = {'param_max' : param_max, 'stepsize' : stepsize, 'iterations' : iterations, 'runs' : runs, 'max_temperature' : max_temperature}
     return optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, problem_init, optimizer_params)
 
+def bfgs_minimize_all(param_type, func, layers, mixer_init, problem_init):
+    optimizer = 'bfgs'
+    optimizer_params = {}
+    return optimizer_minimize_all(param_type, optimizer, func, layers, mixer_init, problem_init, optimizer_params)
+
 def bobyqa_minimize(func, layers, mixer_param_init, problem_param_init, noisy=None, maxfun=None, max_for_global=None, restart=False):
     return bobyqa_minimize_all('standard', func, layers, mixer_param_init, problem_param_init, noisy, maxfun=maxfun, max_for_global=max_for_global, restart=restart)
 
@@ -390,5 +288,17 @@ def sa_minimize_interp2(func, layers, mixer_init, problem_init, param_max, steps
 
 def sa_minimize_fourier(func, layers, mixer_init, problem_init, param_max, stepsize, iterations, runs, max_temperature):
     return sa_minimize_all('fourier', func, layers, mixer_init, problem_init, param_max, stepsize, iterations, runs, max_temperature)
+
+def bfgs_minimize(func, layers, mixer_init, problem_init):
+    return bfgs_minimize_all('standard', func, layers, mixer_init, problem_init)
+
+def bfgs_minimize_interp(func, layers, mixer_init, problem_init):
+    return bfgs_minimize_all('interp', func, layers, mixer_init, problem_init)
+
+def bfgs_minimize_interp2(func, layers, mixer_init, problem_init):
+    return bfgs_minimize_all('interp2', func, layers, mixer_init, problem_init)
+
+def bfgs_minimize_fourier(func, layers, mixer_init, problem_init):
+    return bfgs_minimize_all('fourier', func, layers, mixer_init, problem_init)
 
 
