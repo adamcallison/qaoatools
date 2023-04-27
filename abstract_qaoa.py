@@ -194,7 +194,7 @@ def abstract_qaoa(Hp_cost, Hp_run, layers, shots=None, extra_shots=0, \
         spsa_runs = optimization_options.get('runs', 1)
     if opt_alg == 'bobyqa':
         noisy = optimization_options.get('noisy', True)
-        max_for_global = optimization_options.get('max_for_global', 1.0)
+        max_for_global = optimization_options.get('max_for_global', np.pi)
         maxfun = optimization_options.get('maxfun', None)
         restart = optimization_options.get('restart', False)
     if opt_alg == 'sa':
